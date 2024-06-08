@@ -6,6 +6,7 @@ import time
 import tracemalloc
 from configparser import ConfigParser
 
+import aioconsole
 import requests
 import websockets
 from pydub import AudioSegment
@@ -368,10 +369,8 @@ async def handle_audio_stream() -> None:
 async def async_terminal_input(
     hub_ws: websockets.WebSocketClientProtocol, chat_obj: Chat
 ) -> None:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     while True:
-        text = input("Enter your message: ")
+        text = await aioconsole.ainput("Enter your message: ")
         if "ADDCHAR -" in text.upper():
             text = text.upper().replace("ADDCHAR -", "")
             await chat_obj.change_chat_participant(
@@ -397,7 +396,7 @@ async def main() -> None:
         new_chat = Chat(session_id="183869ed-64de-ab3e-ad64-aed9d8e4b2d8")
         new_chat.waiting_for_chat_reply.clear()
         new_chat.get_current_chat_characters()
-        asyncio.create_task(new_chat.handle_hub_messages(hub_ws))
+        message_task = asyncio.create_task(new_chat.handle_hub_messages(hub_ws))
         await new_chat.authenticate_and_resume_chat(hub_ws)
         # asyncio.create_task(ping(hub_ws))
         await new_chat.chat_started_event.wait()
@@ -407,7 +406,7 @@ async def main() -> None:
         input_task = asyncio.create_task(async_terminal_input(hub_ws, new_chat))
         # handle_audio_stream(),
         while True:
-            await asyncio.gather(new_chat.handle_hub_messages(hub_ws), input_task)
+            await asyncio.gather(message_task, input_task)
     print("test")
 
     # Keep the connection alive
